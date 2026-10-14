@@ -11,7 +11,23 @@ ROOT=Path(__file__).parent
 NAMES=['Maximum power transfer','Sinusoidal steady-state RLC','Series RLC resonance','RC transient response','PN and Zener diode characteristics','Half-wave and bridge rectifiers','BJT characteristics','Single-stage BJT amplifier','BJT RC phase-shift oscillator','JFET as a switch']
 AIMS=['Verify the load resistance for maximum power.','Calculate impedance, current, phase and power in an RLC circuit.','Determine resonance, quality factor and half-power bandwidth.','Examine charging and discharging and estimate the RC time constant.','Plot diode characteristics and analyse current limiting.','Compare rectified waveforms and capacitor filtering.','Explore common-emitter output and input characteristics.','Study voltage gain, frequency response and clipping.','Design an approximate equal-section RC feedback network.','Explore gate control of an n-channel JFET.']
 QUESTIONS=[['Why does maximum power occur at RL = Rth?','Why is efficiency only 50% at matching?'],['When does current lead the applied voltage?','How does reactive power differ from real power?'],['Why does series current peak at resonance?','How does resistance change bandwidth?'],['What fraction of the final voltage is reached at one time constant?','Why is capacitor voltage continuous?'],['How does a series resistor limit diode current?','How does Zener breakdown differ from forward conduction?'],['Why is bridge ripple frequency twice the supply frequency?','Why does a larger filter capacitor reduce ripple?'],['How is DC current gain obtained from measured currents?','How can saturation be identified?'],['Why is the CE output inverted?','What sets the lower and upper cutoff frequencies?'],['What are the Barkhausen conditions?','Why is startup gain greater than the steady oscillation gain?'],['Why must the n-channel gate not be forward biased?','How does cutoff differ from drain pinch-off?']]
-manuals=json.loads((ROOT/'assets/manuals.json').read_text())
+# Manuals are optional so an incomplete asset upload cannot disable the lab.
+manual_index = ROOT / 'assets' / 'manuals.json'
+manuals = {}
+manual_error = ''
+if manual_index.is_file():
+    try:
+        loaded = json.loads(manual_index.read_text(encoding='utf-8'))
+        if isinstance(loaded, dict):
+            manuals = {k: v for k, v in loaded.items()
+                       if isinstance(v, dict) and isinstance(v.get('file'), str)}
+        else:
+            manual_error = 'The manual index is invalid. Upload the original assets folder again.'
+    except (OSError, ValueError):
+        manual_error = 'The manual index could not be read. Upload the original assets folder again.'
+else:
+    manual_error = 'Source manuals are unavailable because assets/manuals.json was not uploaded. Simulations and records remain available.'
+
 st.sidebar.title('🔬 EDC Virtual Lab')
 st.sidebar.caption('PSG Institute of Technology and Applied Research')
 idx=st.sidebar.selectbox('Experiment',range(10),format_func=lambda x:f'{x+1:02d} · {NAMES[x]}',key='experiment')
@@ -166,11 +182,25 @@ with viva:
     st.text_area('Your reasoning',key=f'viva{idx}')
 with manual:
     st.caption('Original supplied material. Numbering in the source manuals differs from the syllabus; the app follows the syllabus sequence. Where a source contains a simplification or typo, the simulator uses its stated model.')
-    selected=st.selectbox('Supplied manual',list(manuals))
-    info=manuals[selected]
-    st.download_button('Download original manual',(ROOT/info['file']).read_bytes(),Path(info['file']).name)
-    with st.expander('Extracted text (equations and tables may be omitted)'):st.text(info.get('text','See original PDF.'))
-    for asset in info.get('images',[]):st.image(str(ROOT/asset),caption='Figure extracted from supplied manual; consult original for context.')
-    st.download_button('Download course syllabus',(ROOT/'assets/syllabus.pdf').read_bytes(),'25IC111_syllabus.pdf')
+    if manual_error:
+        st.info(manual_error)
+    if manuals:
+        selected=st.selectbox('Supplied manual',list(manuals))
+        info=manuals[selected]
+        source=ROOT/info['file']
+        if source.is_file():
+            st.download_button('Download original manual',source.read_bytes(),source.name)
+        else:
+            st.info('This manual file is missing. Upload the complete assets folder to restore the download.')
+        with st.expander('Extracted text (equations and tables may be omitted)'):
+            st.text(info.get('text','See original PDF.'))
+        for asset in info.get('images',[]):
+            figure=ROOT/asset
+            if figure.is_file():
+                st.image(str(figure),caption='Figure extracted from supplied manual; consult original for context.')
+    syllabus=ROOT/'assets/syllabus.pdf'
+    if syllabus.is_file():
+        st.download_button('Download course syllabus',syllabus.read_bytes(),'25IC111_syllabus.pdf')
+
 st.divider()
 st.caption('Department of Electrical and Electronics Engineering · Student learning and laboratory preparation')
